@@ -13,7 +13,7 @@
   },
   "vars": {
     "APP_ORIGIN": "https://thinks-inscription.thinks-tagswin.workers.dev",
-    "DISCORD_CLIENT_ID": "A_REMPLACER",
+    "DISCORD_CLIENT_ID": "1560673055494111272",
     "DISCORD_GUILD_ID": "1498690479288483932",
     "DISCORD_MEMBER_ROLE_ID": "A_REMPLACER"
   },

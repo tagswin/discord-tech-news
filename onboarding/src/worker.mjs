@@ -35,7 +35,7 @@ export function layout(title, body, status = 200, extra = {}) {
   return new Response(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · Thinks</title><style>${CSS}</style></head><body><header><div class="brand">THINKS<span style="color:#b6a2ff">.</span></div><span class="tag">COMMUNAUTÉ SAAS</span></header><main>${body}</main><footer>Thinks · Un espace pour construire, lancer et faire grandir ton SaaS.</footer></body></html>`, {
     status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
       'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://discord.com; frame-ancestors 'none'; base-uri 'none'",
-      'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', ...extra },
+      'Referrer-Policy': 'strict-origin', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', ...extra },
   });
 }
 

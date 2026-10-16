@@ -49,6 +49,8 @@ function answers(csrf) {
 async function start(s) {
   const page = await s.request('/');
   assert.match(page.headers.get('Content-Security-Policy'), /form-action 'self' https:\/\/discord\.com;/);
+  // no-referrer masque Origin sur les soumissions HTML natives, contrairement à fetch().
+  assert.equal(page.headers.get('Referrer-Policy'), 'strict-origin');
   const nonce = page.headers.get('set-cookie').match(/__Host-preauth=([a-f0-9]+)/)[1];
   const auth = await s.request('/auth/start', post({ rules: 'accepted', nonce }, '__Host-preauth=' + nonce));
   assert.equal(auth.status, 303);
@@ -213,4 +215,5 @@ test('rendu protégé contre le HTML des réponses et aucune ressource externe',
   assert.match(text, /&lt;\/textarea&gt;/);
   assert.match(response.headers.get('Content-Security-Policy'), /frame-ancestors 'none'/);
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal(response.headers.get('Referrer-Policy'), 'strict-origin');
 });

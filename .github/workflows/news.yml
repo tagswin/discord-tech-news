@@ -1,0 +1,63 @@
+name: Le Radar Tech
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Action à exécuter
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - test-discord
+          - veille
+
+permissions:
+  contents: write
+
+concurrency:
+  group: radar-tech
+  cancel-in-progress: false
+
+jobs:
+  news:
+    # Aucun runner dans un dépôt privé. L’activation des envois est volontaire.
+    if: github.event.repository.private == false && (github.event_name == 'workflow_dispatch' || vars.BOT_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Vérifier le bot
+        run: python -m unittest discover -s tests -v
+      - name: Lire les actualités et publier
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_MODE: ${{ inputs.mode || 'veille' }}
+        shell: bash
+        run: |
+          case "$RUN_MODE" in
+            preview) python bot.py --dry-run ;;
+            test-discord) python bot.py --test-message ;;
+            veille) python bot.py ;;
+            *) exit 1 ;;
+          esac
+      - name: Sauvegarder l’historique même après un échec d’envoi
+        if: always() && steps.checkout.outcome == 'success'
+        shell: bash
+        run: |
+          if [ -f data/state.json ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add data/state.json
+            if ! git diff --cached --quiet; then
+              git commit -m 'Actualiser l’historique des publications [skip ci]'
+              git push
+            fi
+          fi

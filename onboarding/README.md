@@ -2,6 +2,14 @@
 
 Application séparée du bot de news, prévue pour **Cloudflare Workers Free + D1 Free**. Pas de processus Discord connecté en permanence : les requêtes HTTP attribuent le rôle lorsque le formulaire est validé.
 
+## Déploiement préparé
+
+Adresse : https://thinks-inscription.thinks-tagswin.workers.dev
+
+Le Worker, la base D1 et le nettoyage quotidien sont créés. La connexion reste désactivée tant que les identifiants de l’application Discord, du rôle Membre et les deux secrets ne sont pas configurés. Cette adresse n’est donc pas encore un parcours d’inscription opérationnel.
+
+Les journaux et traces sont échantillonnés ; les paramètres d’URL sont masqués pour ne pas conserver les codes OAuth dans les URL journalisées. Aucun contenu de formulaire ni secret n’est écrit par le code dans les logs.
+
 ## Parcours livré
 
 1. Le nouveau membre rejoint le serveur et voit le salon `#inscription`.

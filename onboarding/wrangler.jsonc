@@ -1,12 +1,18 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "thinks-inscription",
-  "main": "src/worker.mjs",
+  "main": "src/index.mjs",
   "compatibility_date": "2026-10-16",
   "workers_dev": true,
-  "observability": { "enabled": false },
+  "account_id": "79da5f54f2a80db02b37cf77990c015c",
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 0.1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  },
   "vars": {
-    "APP_ORIGIN": "https://thinks-inscription.TON-SOUS-DOMAINE.workers.dev",
+    "APP_ORIGIN": "https://thinks-inscription.thinks-tagswin.workers.dev",
     "DISCORD_CLIENT_ID": "A_REMPLACER",
     "DISCORD_GUILD_ID": "1498690479288483932",
     "DISCORD_MEMBER_ROLE_ID": "A_REMPLACER"
@@ -15,7 +21,7 @@
     {
       "binding": "DB",
       "database_name": "thinks-inscription",
-      "database_id": "A_REMPLACER_APRES_CREATION_D1",
+      "database_id": "2bf3f8a4-ab87-4e3a-9e9e-559584676ea0",
       "migrations_dir": "migrations"
     }
   ],

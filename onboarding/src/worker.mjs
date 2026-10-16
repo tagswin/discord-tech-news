@@ -34,7 +34,7 @@ const CSS = `
 export function layout(title, body, status = 200, extra = {}) {
   return new Response(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · Thinks</title><style>${CSS}</style></head><body><header><div class="brand">THINKS<span style="color:#b6a2ff">.</span></div><span class="tag">COMMUNAUTÉ SAAS</span></header><main>${body}</main><footer>Thinks · Un espace pour construire, lancer et faire grandir ton SaaS.</footer></body></html>`, {
     status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
-      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://discord.com; frame-ancestors 'none'; base-uri 'none'",
       'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', ...extra },
   });
 }
@@ -111,7 +111,7 @@ async function member(userId, env) {
 
 async function sessionFor(request, env) {
   const token = cookies(request)['__Host-session'];
-  if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new Problem(401, 'Ta session a expiré. Reviens à l’accueil pour te reconnecter.');
+  if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new Problem(401, 'Aucune connexion Discord active. Reviens à l’accueil pour te connecter.');
   const session = await env.DB.prepare('SELECT * FROM sessions WHERE token_hash = ? AND expires_at > ?').bind(await hash(token), now()).first();
   if (!session) throw new Problem(401, 'Ta session a expiré. Reviens à l’accueil pour te reconnecter.');
   return session;
@@ -200,7 +200,10 @@ export default {
       const status = error instanceof Problem ? error.status : 503;
       const message = error instanceof Problem ? error.message : 'Le service est momentanément indisponible. Réessaie dans un instant ou contacte l’équipe Thinks.';
       // Ne jamais journaliser les URLs OAuth, jetons, cookies ou réponses des membres.
-      return layout('Une étape reste à terminer', `<h1>Une étape reste à terminer.</h1><p role="alert">${esc(message)}</p><p><a class="button secondary" href="/form">Réessayer le formulaire</a></p><p><a href="/">Revenir au règlement et à la connexion</a></p>`, status);
+      const retry = status === 401
+        ? '<p><a class="button" href="/">Se connecter avec Discord</a></p>'
+        : '<p><a class="button secondary" href="/form">Réessayer le formulaire</a></p><p><a href="/">Revenir au règlement et à la connexion</a></p>';
+      return layout('Une étape reste à terminer', `<h1>Une étape reste à terminer.</h1><p role="alert">${esc(message)}</p>${retry}`, status);
     }
   },
   async scheduled(_event, env) {

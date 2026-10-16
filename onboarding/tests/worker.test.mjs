@@ -48,6 +48,7 @@ function answers(csrf) {
 
 async function start(s) {
   const page = await s.request('/');
+  assert.match(page.headers.get('Content-Security-Policy'), /form-action 'self' https:\/\/discord\.com;/);
   const nonce = page.headers.get('set-cookie').match(/__Host-preauth=([a-f0-9]+)/)[1];
   const auth = await s.request('/auth/start', post({ rules: 'accepted', nonce }, '__Host-preauth=' + nonce));
   assert.equal(auth.status, 303);
@@ -113,6 +114,16 @@ test('une session expirée ne peut pas envoyer de réponses', async t => {
   s.sqlite.prepare('UPDATE sessions SET expires_at = ?').run(epoch() - 10);
   assert.equal((await s.request('/submit', post(answers(session.csrf), cookie))).status, 401);
   assert.equal(s.api.calls.filter(c => c.options.method === 'PUT').length, 0);
+});
+
+test('sans connexion, la reprise dirige vers la connexion et pas vers le formulaire protégé', async t => {
+  const s = setup(t);
+  const response = await s.request('/form');
+  assert.equal(response.status, 401);
+  const html = await response.text();
+  assert.match(html, /Aucune connexion Discord active/);
+  assert.match(html, /href="\/">Se connecter avec Discord/);
+  assert.ok(!html.includes('href="/form"'));
 });
 
 test('formulaire incomplet, choix inventés et réponses multiples interdites ne donnent aucun rôle', async t => {

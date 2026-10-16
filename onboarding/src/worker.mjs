@@ -47,7 +47,7 @@ export function landing(nonce, configured = true) {
 
 export function formPage(session, values = {}, error = '') {
   const fields = QUESTIONS.map((q, index) => `<fieldset><legend><span class="question-index">Question ${index + 1} · obligatoire</span>${esc(q.title)}</legend>${q.hint ? `<p class="hint">${esc(q.hint)}</p>` : ''}<div class="choices">${q.options.map((label, i) => `<label class="choice"><input type="${q.multiple ? 'checkbox' : 'radio'}" name="${q.id}" value="${i}" ${!q.multiple ? 'required' : ''} ${((values[q.id] || []).map(String).includes(String(i))) ? 'checked' : ''}>${esc(label)}</label>`).join('')}</div>${q.multiple ? '<p class="hint">Plusieurs réponses possibles. « Rien pour l’instant » doit être sélectionné seul.</p>' : ''}</fieldset>`).join('');
-  return layout('Ton profil', `<div class="eyebrow">Faisons connaissance</div><h1>Parle-nous de ton projet.</h1><p>Ces réponses aident l’équipe à comprendre ton parcours et les besoins de la communauté. Elles ne sont pas affichées aux autres membres.</p>${steps(1)}<div class="account"><span>Connecté : <strong>${esc(session.display_name)}</strong></span><form class="logout" method="post" action="/logout"><input type="hidden" name="csrf" value="${esc(session.csrf)}"><button>Changer de compte</button></form></div>${error ? `<div class="error" role="alert">${esc(error)}</div>` : ''}<form method="post" action="/submit"><input type="hidden" name="csrf" value="${esc(session.csrf)}">${fields}<fieldset><legend><span class="question-index">Question 7 · facultative</span>Si tu pouvais débloquer UNE chose dans ton SaaS aujourd’hui, ce serait quoi ?</legend><textarea name="wish" maxlength="1000" aria-label="Ce que tu aimerais débloquer" placeholder="Ce qui ferait vraiment avancer ton projet…">${esc(values.wish?.[0] || '')}</textarea><p class="hint">1 000 caractères maximum. N’indique aucune donnée confidentielle.</p></fieldset><p class="privacy">Les six premières questions sont obligatoires pour accéder aux salons. Ton identifiant Discord, ton nom d’utilisateur et tes réponses sont conservés jusqu’à 90 jours dans l’espace privé de l’équipe, hébergé chez Cloudflare. Pour demander leur suppression, contacte un administrateur de Thinks dans Discord.</p><button class="full">Valider mon profil et accéder au serveur →</button></form>`);
+  return layout('Ton profil', `<div class="eyebrow">Faisons connaissance</div><h1>Parle-nous de ton projet.</h1><p>Ces réponses aident l’équipe à comprendre ton parcours et les besoins de la communauté. Elles ne sont pas affichées aux autres membres.</p>${steps(1)}<div class="account"><span>Connecté : <strong>${esc(session.display_name)}</strong></span><form class="logout" method="post" action="/logout"><input type="hidden" name="csrf" value="${esc(session.csrf)}"><button>Changer de compte</button></form></div>${error ? `<div class="error" role="alert">${esc(error)}</div>` : ''}<form method="post" action="/submit"><input type="hidden" name="csrf" value="${esc(session.csrf)}">${fields}<fieldset><legend><span class="question-index">Question 7 · facultative</span>Si tu pouvais débloquer UNE chose dans ton SaaS aujourd’hui, ce serait quoi ?</legend><textarea name="wish" maxlength="1000" aria-label="Ce que tu aimerais débloquer" placeholder="Ce qui ferait vraiment avancer ton projet…">${esc(values.wish?.[0] || '')}</textarea><p class="hint">1 000 caractères maximum. N’indique aucune donnée confidentielle.</p></fieldset><p class="privacy">Les six premières questions sont obligatoires pour accéder aux salons. Ton identifiant Discord, ton nom d’utilisateur et tes réponses sont conservés jusqu’à 90 jours dans l’espace privé de l’équipe, hébergé chez Cloudflare. Une copie identifiée est transmise au salon privé de l’équipe dans Discord ; cette copie est gérée séparément par le staff. Pour demander leur suppression, contacte un administrateur de Thinks dans Discord.</p><button class="full">Valider mon profil et accéder au serveur →</button></form>`);
 }
 
 export function validateAnswers(data) {
@@ -109,6 +109,32 @@ async function member(userId, env) {
   return result;
 }
 
+export async function sendReports(env) {
+  if (!/^\d{15,22}$/.test(env.DISCORD_REPORT_CHANNEL_ID || '')) return;
+  const channel = await discord(`/channels/${env.DISCORD_REPORT_CHANNEL_ID}`, env);
+  const hidden = channel.permission_overwrites?.some(p => String(p.id) === env.DISCORD_GUILD_ID && (BigInt(p.deny || 0) & 1024n) !== 0n);
+  const memberCanSee = channel.permission_overwrites?.some(p => String(p.id) === env.DISCORD_MEMBER_ROLE_ID && (BigInt(p.allow || 0) & 1024n) !== 0n);
+  if (channel.guild_id !== env.DISCORD_GUILD_ID || channel.type !== 0 || !hidden || memberCanSee) throw new Problem(503, 'Le salon de réponses doit être privé et réservé au staff.');
+  const rows = await env.DB.prepare('SELECT * FROM applications WHERE discord_message_id IS NULL ORDER BY submitted_at LIMIT 5').all();
+  for (const row of rows.results) {
+    const answers = JSON.parse(row.answers_json);
+    const fields = QUESTIONS.map(q => ({ name: q.title, value: (answers[q.id] || []).join('\n') || 'Non renseigné', inline: false }));
+    fields.push({ name: 'Si tu pouvais débloquer UNE chose aujourd’hui', value: (answers.wish || 'Non renseigné').slice(0, 1000), inline: false });
+    const response = await fetch(`${API}/channels/${env.DISCORD_REPORT_CHANNEL_ID}/messages`, {
+      method: 'POST', signal: AbortSignal.timeout(12000),
+      headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: `📋 Formulaire de <@${row.user_id}> — ID : ${row.user_id}`,
+        allowed_mentions: { parse: [] }, nonce: (await hash(row.user_id + ':' + row.submitted_at)).slice(0, 24), enforce_nonce: true,
+        embeds: [{ title: 'Nouveau profil Thinks', description: `Pseudo : ${row.display_name}`.slice(0, 300), fields,
+          color: 11969279, timestamp: new Date(row.submitted_at * 1000).toISOString(), footer: { text: 'Réponses privées · équipe Thinks' } }] }),
+    });
+    if (!response.ok) throw new Problem(503, 'Envoi du compte rendu Discord en attente.');
+    const message = await response.json();
+    if (!/^\d{15,22}$/.test(message.id || '')) throw new Problem(503, 'Confirmation Discord absente.');
+    await env.DB.prepare('UPDATE applications SET discord_message_id = ? WHERE user_id = ? AND submitted_at = ?').bind(message.id, row.user_id, row.submitted_at).run();
+  }
+}
+
 async function sessionFor(request, env) {
   const token = cookies(request)['__Host-session'];
   if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new Problem(401, 'Aucune connexion Discord active. Reviens à l’accueil pour te connecter.');
@@ -162,6 +188,7 @@ async function route(request, env) {
   if (request.method === 'GET' && url.pathname === '/form') {
     const session = await sessionFor(request, env);
     await member(session.user_id, env);
+    try { await sendReports(env); } catch { console.warn(JSON.stringify({ event: 'discord_report_pending' })); }
     return formPage(session);
   }
   if (request.method === 'POST' && ['/submit', '/logout'].includes(url.pathname)) {
@@ -185,6 +212,7 @@ async function route(request, env) {
       await discord(`/guilds/${env.DISCORD_GUILD_ID}/members/${session.user_id}/roles/${env.DISCORD_MEMBER_ROLE_ID}`, env, 'PUT');
     }
     await env.DB.prepare('UPDATE applications SET role_granted_at = ? WHERE user_id = ?').bind(now(), session.user_id).run();
+    try { await sendReports(env); } catch { console.warn(JSON.stringify({ event: 'discord_report_pending' })); }
     await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(session.token_hash).run();
     const page = layout('Bienvenue chez Thinks', `${steps(2)}<section class="card"><div class="success">✓</div><h1>Bienvenue chez Thinks.</h1><p>Ton profil est enregistré et le rôle Membre t’a été attribué. Tu peux maintenant accéder aux salons de la communauté.</p><a class="button" href="https://discord.com/channels/${esc(env.DISCORD_GUILD_ID)}">Ouvrir le serveur Discord →</a></section>`);
     page.headers.append('Set-Cookie', cookie('session', '', 0));
@@ -207,6 +235,7 @@ export default {
     }
   },
   async scheduled(_event, env) {
+    try { await sendReports(env); } catch { console.warn(JSON.stringify({ event: 'discord_report_pending' })); }
     await env.DB.batch([
       env.DB.prepare('DELETE FROM oauth_states WHERE expires_at < ?').bind(now()),
       env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now()),

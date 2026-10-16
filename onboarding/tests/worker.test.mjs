@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import worker, { QUESTIONS, validateAnswers, formPage } from '../src/worker.mjs';
+import worker, { QUESTIONS, validateAnswers, formPage, sendReports } from '../src/worker.mjs';
 
 const ORIGIN = 'https://thinks.example';
 const USER = '111111111111111111';
@@ -13,19 +13,23 @@ const epoch = () => Math.floor(Date.now() / 1000);
 function setup(t) {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../migrations/0001_initial.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../migrations/0002_discord_reports.sql', import.meta.url), 'utf8'));
   const DB = {
     prepare(sql) {
       return { values: [], bind(...values) { this.values = values; return this; },
         async first() { return sqlite.prepare(sql).get(...this.values) || null; },
+        async all() { return { results: sqlite.prepare(sql).all(...this.values) }; },
         async run() { return { meta: sqlite.prepare(sql).run(...this.values) }; } };
     },
     async batch(queries) { return Promise.all(queries.map(q => q.run())); },
   };
   const env = { DB, APP_ORIGIN: ORIGIN, DISCORD_CLIENT_ID: '333333333333333333', DISCORD_CLIENT_SECRET: 'test-only-client-secret', DISCORD_BOT_TOKEN: 'test-only-bot-token', DISCORD_GUILD_ID: GUILD, DISCORD_MEMBER_ROLE_ID: ROLE };
-  const api = { calls: [], pending: false, notMember: false, roleFailure: false };
+  const api = { calls: [], pending: false, notMember: false, roleFailure: false, reportFailure: false, channelPublic: false };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, options = {}) => {
     api.calls.push({ url: String(url), options });
+    if (url === 'https://discord.com/api/v10/channels/1560679214712234135') return Response.json({ guild_id: GUILD, type: 0, permission_overwrites: api.channelPublic ? [] : [{ id: GUILD, deny: '1024', allow: '0' }] });
+    if (url === 'https://discord.com/api/v10/channels/1560679214712234135/messages') return api.reportFailure ? Response.json({}, { status: 403 }) : Response.json({ id: '555555555555555555' });
     if (url === 'https://discord.com/api/oauth2/token') return Response.json({ access_token: 'test-only-oauth-token', token_type: 'Bearer' });
     if (url === 'https://discord.com/api/v10/users/@me') return Response.json({ id: USER, username: 'Testeur', global_name: '<script>bad()</script>' });
     if (url === `https://discord.com/api/v10/guilds/${GUILD}/members/${USER}`) return api.notMember ? Response.json({}, { status: 404 }) : Response.json({ pending: api.pending, roles: [] });
@@ -202,8 +206,8 @@ test('échec Discord : réponses privées conservées et nouvelle tentative poss
 
 test('nettoyage quotidien : réponses de plus de 90 jours supprimées', async t => {
   const s = setup(t);
-  s.sqlite.prepare('INSERT INTO applications VALUES (?, ?, ?, ?, ?, ?, ?)').run(USER, 'Testeur', '{}', epoch(), 'v1', epoch() - 91 * 86400, epoch());
-  s.sqlite.prepare('INSERT INTO applications VALUES (?, ?, ?, ?, ?, ?, ?)').run('444444444444444444', 'Récent', '{}', epoch(), 'v1', epoch() - 89 * 86400, epoch());
+  s.sqlite.prepare('INSERT INTO applications VALUES (?, ?, ?, ?, ?, ?, ?, NULL)').run(USER, 'Testeur', '{}', epoch(), 'v1', epoch() - 91 * 86400, epoch());
+  s.sqlite.prepare('INSERT INTO applications VALUES (?, ?, ?, ?, ?, ?, ?, NULL)').run('444444444444444444', 'Récent', '{}', epoch(), 'v1', epoch() - 89 * 86400, epoch());
   await worker.scheduled({}, s.env);
   assert.equal(s.sqlite.prepare('SELECT COUNT(*) AS n FROM applications').get().n, 1);
 });
@@ -216,4 +220,33 @@ test('rendu protégé contre le HTML des réponses et aucune ressource externe',
   assert.match(response.headers.get('Content-Security-Policy'), /frame-ancestors 'none'/);
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal(response.headers.get('Referrer-Policy'), 'strict-origin');
+});
+
+test('compte rendu identifié, sans ping, envoyé une seule fois', async t => {
+  const s = setup(t);
+  s.env.DISCORD_REPORT_CHANNEL_ID = '1560679214712234135';
+  const {cookie, session} = await login(s);
+  assert.equal((await s.request('/submit', post(answers(session.csrf), cookie))).status, 200);
+  await sendReports(s.env);
+  const messages = s.api.calls.filter(c => c.url.endsWith('/messages'));
+  assert.equal(messages.length, 1);
+  const body = JSON.parse(messages[0].options.body);
+  assert.ok(body.content.includes(USER));
+  assert.deepEqual(body.allowed_mentions, {parse: []});
+  assert.equal(body.embeds[0].fields.length, 7);
+});
+
+test('salon public ou Discord en échec : pas de fuite et inscription réussie', async t => {
+  const s = setup(t);
+  s.env.DISCORD_REPORT_CHANNEL_ID = '1560679214712234135';
+  s.api.channelPublic = true;
+  const {cookie, session} = await login(s);
+  assert.equal((await s.request('/submit', post(answers(session.csrf), cookie))).status, 200);
+  assert.equal(s.api.calls.filter(c=>c.url.endsWith('/messages')).length, 0);
+  s.api.channelPublic = false; s.api.reportFailure = true;
+  await assert.rejects(sendReports(s.env));
+  assert.equal(s.sqlite.prepare('SELECT discord_message_id FROM applications').get().discord_message_id, null);
+  s.api.reportFailure = false;
+  await sendReports(s.env);
+  assert.equal(s.sqlite.prepare('SELECT discord_message_id FROM applications').get().discord_message_id, '555555555555555555');
 });

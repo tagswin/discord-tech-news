@@ -81,6 +81,14 @@ Le premier déploiement sert à obtenir l’URL ; ne pas partager le lien aux me
 
 ## Réponses privées
 
+### Copie dans Discord
+
+Le salon staff configuré est `1560679214712234135` (`DISCORD_REPORT_CHANNEL_ID`). Donner à **Thinks Accueil** les permissions Voir le salon, Envoyer des messages et Intégrer des liens. Le salon doit refuser Voir le salon à `@everyone`, sans l’autoriser au rôle Membre. Le bot vérifie ces deux restrictions et l’appartenance du salon au bon serveur avant tout envoi. Les autres autorisations de rôles doivent aussi être contrôlées par le staff.
+
+Chaque compte rendu contient le pseudo, la mention du compte (sans notification), l’identifiant Discord, la date et les sept réponses. Les réponses existantes sans message sont reprises, cinq par passage. Un passage automatique est prévu toutes les cinq minutes, sous réserve du délai de propagation des déclencheurs Cloudflare. Un échec d’envoi n’empêche pas l’inscription ; les réponses restent en attente. `discord_message_id` indique l’envoi confirmé. Le nonce Discord limite les doublons lors de tentatives rapprochées, sans garantir exactement un envoi en cas d’interruption prolongée.
+
+La suppression après 90 jours concerne D1 ; les copies dans Discord doivent être supprimées séparément par le staff, notamment en cas de demande d’effacement.
+
 Les réponses sont dans la base **Cloudflare D1 → thinks-inscription → table applications**, accessible aux personnes autorisées sur le compte Cloudflare. Il n’y a pas de liste publique des réponses ni de rôles qui exposeraient l’âge, le budget ou les blocages.
 
 - `answers_json` contient le questionnaire.

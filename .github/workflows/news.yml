@@ -1,8 +1,16 @@
 name: Le Radar Tech
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - bot.py
+      - config.json
+      - .github/workflows/news.yml
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '0 9,18 * * *'
+      timezone: Europe/Paris
+    - cron: '3-53/10 * * * *'
   workflow_dispatch:
     inputs:
       mode:

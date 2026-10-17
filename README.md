@@ -58,7 +58,7 @@ Maximum trois alertes sur 24 heures glissantes, espacées d'au moins deux heures
 
 ## Horaires et fiabilité
 
-Le workflow se lance toutes les dix minutes ; Python décide si un récapitulatif de 9 h ou 18 h est dû, avec le fuseau `Europe/Paris` et le changement été/hiver. En cas de retard, un récapitulatif peut être rattrapé dans les deux heures suivant l'horaire prévu. Il n'est ensuite plus envoyé pour ce créneau.
+Le workflow prévoit des déclenchements dédiés à 9 h et 18 h dans le fuseau `Europe/Paris`, plus une veille toutes les dix minutes décalée de trois minutes après l'heure. Il s'exécute aussi après une modification du code ou de la configuration du bot, si `BOT_ENABLED` est activé. Python décide si un récapitulatif est dû, avec le changement été/hiver. Un créneau reste rattrapable jusqu'au suivant le même jour : celui de 9 h jusqu'à 18 h, puis celui de 18 h jusqu'à minuit. Après 18 h, le bot envoie uniquement le récapitulatif du soir, sans rattraper aussi celui du matin. Aucun ancien créneau n'est repris le lendemain.
 
 GitHub peut retarder ou supprimer des lancements programmés : ce n'est donc pas un service à la minute près. Les workflows programmés d'un dépôt public peuvent être désactivés après 60 jours sans activité. Contrôler l'onglet Actions si le bot reste silencieux : https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
 

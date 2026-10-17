@@ -22,11 +22,16 @@ class BotTests(unittest.TestCase):
         self.assertEqual(bot.due_slot(datetime(2026, 12, 1, 8, tzinfo=timezone.utc), [], [9, 18]), '2026-12-01T09')
         self.assertIsNone(bot.due_slot(datetime(2026, 12, 1, 7, 59, tzinfo=timezone.utc), [], [9, 18]))
 
-    def test_slots_no_repeat_and_bounded_catchup(self):
+    def test_slots_no_repeat_and_late_catchup(self):
         now = datetime(2026, 10, 16, 7, 35, tzinfo=timezone.utc)
         self.assertEqual(bot.due_slot(now, [], [9, 18]), '2026-10-16T09')
         self.assertIsNone(bot.due_slot(now, ['2026-10-16T09'], [9, 18]))
-        self.assertIsNone(bot.due_slot(now + timedelta(hours=2), [], [9, 18]))
+        self.assertEqual(bot.due_slot(now + timedelta(hours=2), [], [9, 18]), '2026-10-16T09')
+        self.assertEqual(bot.due_slot(datetime(2026, 10, 17, 9, 16, tzinfo=timezone.utc), [], [9, 18]), '2026-10-17T09')
+        evening = datetime(2026, 10, 17, 17, 40, tzinfo=timezone.utc)
+        self.assertEqual(bot.due_slot(evening, [], [9, 18]), '2026-10-17T18')
+        self.assertIsNone(bot.due_slot(evening, ['2026-10-17T18'], [9, 18]))
+        self.assertIsNone(bot.due_slot(datetime(2026, 10, 18, 1, tzinfo=timezone.utc), [], [9, 18]))
 
     def test_feed_dates_publishers_html_and_https(self):
         item = '''<item><title><![CDATA[Une &amp; nouvelle - Numerama]]></title>

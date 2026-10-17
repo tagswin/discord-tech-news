@@ -95,8 +95,10 @@ def due_slot(now, completed, hours):
     for hour in reversed(sorted(hours)):
         target = local.replace(hour=hour, minute=0, second=0, microsecond=0)
         key = target.strftime('%Y-%m-%dT%H')
-        if timedelta(0) <= local - target < timedelta(minutes=120) and key not in completed:
-            return key
+        if local >= target:
+            # Le dernier créneau du jour reste valable jusqu’au suivant.
+            # Ne jamais publier un ancien créneau après celui qui l’a remplacé.
+            return None if key in completed else key
     return None
 
 
@@ -203,6 +205,8 @@ def main():
         raise RuntimeError('Tous les flux sont indisponibles : aucun envoi.')
     articles = sorted([a for batch, _ in results for a in batch], key=lambda a: a['published'], reverse=True)
     slot = due_slot(now, state['digests'], config['digest_hours'])
+    print('Heure de Paris : ' + now.astimezone(ZoneInfo('Europe/Paris')).strftime('%Y-%m-%d %H:%M')
+          + ' ; récapitulatif dû : ' + (slot or 'aucun (horaire non atteint ou déjà traité)'))
     posts = []
     if slot or args.dry_run:
         selected = select_digest(articles, config['categories'], state['sent'])

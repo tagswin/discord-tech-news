@@ -22,13 +22,15 @@ test('XML RSS, médias acceptés et articles périmés',()=>{
   assert.equal(parseNews(xml.replace('www.numerama.com','evilnumerama.com'),'IA',date).length,0);
   assert.equal(parseNews(xml,'IA',new Date('2026-10-20T00:00Z')).length,0);
   assert.equal(chooseNews(a, a).length,0);
+  const bing=xml.replace('<source url="https://www.numerama.com">Numerama</source>','<News:Source>Numerama</News:Source>').replace('https://news.google.com/articles/123','http://www.bing.com/news/apiclick.aspx?url=https%3A%2F%2Fwww.numerama.com%2Farticle');
+  assert.equal(parseNews(bing,'IA',date)[0].url,'https://www.numerama.com/article');
 });
 test('publication confirmée puis anti-doublon ; aucune modification en cas de refus Discord',async t=>{
   const db=new DatabaseSync(':memory:');db.exec(readFileSync(new URL('../migrations/0003_news_scheduler.sql',import.meta.url),'utf8'));
   db.prepare('INSERT INTO news_state(id,state_json)VALUES(1,?)').run(JSON.stringify({started_at:date.toISOString(),sent:[],digests:[],alerts:[]}));
   const env={NEWS_ENABLED:'true',DISCORD_BOT_TOKEN:'test',DISCORD_NEWS_CHANNEL_ID:'1560649110628073523',DB:{prepare(sql){return {values:[],bind(...v){this.values=v;return this;},async first(){return db.prepare(sql).get(...this.values)||null;},async run(){return db.prepare(sql).run(...this.values);}};}}};
   const old=globalThis.fetch;let sends=0,deny=true;
-  globalThis.fetch=async(url,options)=>{if(String(url).startsWith('https://news.google.com/'))return new Response(xml);sends++;return deny?new Response('',{status:403}):Response.json({id:'555555555555555555'});};
+  globalThis.fetch=async(url,options)=>{if(options?.method!=='POST')return new Response(xml);sends++;return deny?new Response('',{status:403}):Response.json({id:'555555555555555555'});};
   t.after(()=>{globalThis.fetch=old;db.close();});
   await assert.rejects(runNews(env,true,date),/403/);
   assert.equal(JSON.parse(db.prepare('SELECT state_json FROM news_state').get().state_json).digests.length,0);

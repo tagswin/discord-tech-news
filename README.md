@@ -2,13 +2,15 @@
 
 ## Planification active : Cloudflare (depuis le 18 octobre 2026)
 
-La publication automatique est désormais assurée par le Worker **thinks-inscription**, avec le bot **Thinks Accueil**, dans `#world-news`. GitHub Actions n’exécute plus de publications automatiques : il reste disponible pour les tests et aperçus manuels.
+La publication automatique est désormais assurée par le Worker **thinks-inscription**, avec le webhook **Le Radar Tech**, dans `#world-news`. GitHub Actions n’exécute plus de publications automatiques : il reste disponible pour les tests et aperçus manuels.
 
 Les créneaux restent **9 h et 18 h, heure de Paris**. Le déclencheur Cloudflare existant passe toutes les cinq minutes ; les créneaux dus sont prioritaires, et la veille hors récapitulatif se fait au plus toutes les dix minutes. Les modifications de déclencheurs peuvent mettre jusqu’à quinze minutes à se propager. Cela ne garantit pas une publication à la seconde près.
 
 Le code actif est `onboarding/src/news.mjs` et la configuration des rubriques et médias est `onboarding/src/news-config.mjs`. L’historique est dans **Cloudflare D1 → thinks-inscription → news_state** ; `data/state.json` est une archive importée lors de la migration. Un verrou D1 empêche les exécutions simultanées. Une interruption entre envoi Discord et sauvegarde peut cependant provoquer un doublon.
 
-Pour mettre en pause, passer la variable Cloudflare `NEWS_ENABLED` à `false`. Le salon est choisi par `DISCORD_NEWS_CHANNEL_ID`. Le secret `DISCORD_BOT_TOKEN` existant est réutilisé, sans copie dans GitHub. Le bot doit avoir les permissions Voir le salon, Envoyer des messages et Intégrer des liens.
+Les recherches actives utilisent les flux RSS de Bing Actualités, complétés par les flux directs de Numerama et Frandroid classés par thème. Google Actualités ne répondait pas depuis Cloudflare lors de la migration. Les médias autorisés, les rubriques, la limite de 24 heures, les filtres commerciaux et les règles d’alerte restent appliqués. Les liens Bing sont décodés pour conserver le lien du média ; les reprises sur un domaine non autorisé sont exclues.
+
+Pour mettre en pause, passer la variable Cloudflare `NEWS_ENABLED` à `false`. Le secret Cloudflare `DISCORD_NEWS_WEBHOOK` contient le webhook du salon des news ; aucune valeur secrète n’est stockée dans GitHub. Si ce secret est absent, le code peut utiliser `DISCORD_BOT_TOKEN` et `DISCORD_NEWS_CHANNEL_ID`, sous réserve que le bot ait Voir le salon, Envoyer des messages et Intégrer des liens.
 
 Vérification : dans `onboarding`, lancer `node --test tests/news.test.mjs tests/worker.test.mjs`.
 

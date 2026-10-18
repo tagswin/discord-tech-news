@@ -9,17 +9,17 @@ export function parseNews(xml, category, date = new Date()) {
   const out = [], cutoff = +date - 86400000;
   for (const match of xml.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)) {
     const item = match[1], source = item.match(/<source\b([^>]*)>([\s\S]*?)<\/source>/i);
-    if (!source) continue;
-    let domain;
-    try { domain = new URL(decode(source[1].match(/\burl=["']([^"']+)["']/i)?.[1])).hostname.replace(/^www\./, ''); } catch { continue; }
+    let domain, publisher, url=decode(tag(item, 'link')).trim();
+    try {
+      if(source){domain=new URL(decode(source[1].match(/\burl=["']([^"']+)["']/i)?.[1])).hostname.replace(/^www\./,'');publisher=clean(source[2]);}
+      else {const wrapped=new URL(url);if(wrapped.hostname.endsWith('.bing.com')&&wrapped.searchParams.has('url'))url=wrapped.searchParams.get('url');domain=new URL(url).hostname.replace(/^www\./,'');publisher=clean(tag(item,'News:Source'))||domain;}
+    } catch { continue; }
     if (!config.allowed_domains.some(d => domain === d || domain.endsWith('.' + d))) continue;
     const published = Date.parse(tag(item, 'pubDate'));
     if (!Number.isFinite(published) || published < cutoff || published > +date + 300000) continue;
-    const publisher = clean(source[2]);
     let title = clean(tag(item, 'title'));
     if (publisher && title.endsWith(' - ' + publisher)) title = title.slice(0, -publisher.length - 3);
     if (new RegExp(config.excluded_pattern, 'i').test(title)) continue;
-    const url = decode(tag(item, 'link')).trim();
     if (!url.startsWith('https://') || !title) continue;
     out.push({title, publisher, domain, url, category, published: new Date(published).toISOString()});
     if (out.length >= 25) break;
@@ -53,7 +53,7 @@ export function chooseNews(articles, sent) {
 
 async function fetchNews(c, date) {
   try {
-    const url='https://news.google.com/rss/search?'+new URLSearchParams({q:c.query+' when:1d',hl:'fr',gl:'FR',ceid:'FR:fr'});
+    const url=c.rss || 'https://www.bing.com/news/search?'+new URLSearchParams({q:c.bing_query||c.query,format:'RSS',setlang:'fr-fr',cc:'FR',count:'30'});
     const response=await fetch(url,{headers:{'User-Agent':'ThinksRadarTech/2.0'},signal:AbortSignal.timeout(15000)});
     if(!response.ok)throw Error('rss');
     const reader=response.body.getReader();let bytes=0,xml='';const decoder=new TextDecoder();
@@ -66,7 +66,14 @@ async function fetchNews(c, date) {
 
 async function postNews(env, articles, heading) {
   const body={content:heading,allowed_mentions:{parse:[]},embeds:articles.map(a=>({title:a.title.slice(0,240),url:a.url,description:`**${a.category.slice(0,80)}** · ${a.publisher.slice(0,80)}`,timestamp:a.published,color:5793266}))};
-  const response=await fetch(`${API}/channels/${env.DISCORD_NEWS_CHANNEL_ID}/messages`,{method:'POST',headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
+  let endpoint=`${API}/channels/${env.DISCORD_NEWS_CHANNEL_ID}/messages`;
+  const headers={'Content-Type':'application/json'};
+  if(env.DISCORD_NEWS_WEBHOOK){
+    const url=new URL(env.DISCORD_NEWS_WEBHOOK);
+    if(url.protocol!=='https:'||url.hostname!=='discord.com'||!/^\/api\/webhooks\/\d+\/[\w-]+$/.test(url.pathname))throw Error('invalid_news_webhook');
+    url.search='?wait=true';endpoint=url.href;body.username='Le Radar Tech';
+  }else headers.Authorization=`Bot ${env.DISCORD_BOT_TOKEN}`;
+  const response=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw Error('discord_news_http_'+response.status);
   const message=await response.json();
   if(!message.id)throw Error('discord_news_confirmation');
@@ -81,9 +88,10 @@ export async function runNews(env, force=false, date=new Date()) {
   try {
     const state=JSON.parse(lease.state_json), slot=dueNews(date,state.digests);
     if(!force && !slot && seconds-lease.last_check<590)return {status:'not_due'};
-    const results=await Promise.all(config.categories.map(c=>fetchNews(c,date)));
+    const results=await Promise.all([...config.categories,{rss:'https://www.numerama.com/feed/',name:''},{rss:'https://www.frandroid.com/feed',name:''}].map(c=>fetchNews(c,date)));
     if(!results.some(r=>r.ok))throw Error('all_news_feeds_failed');
-    const articles=results.flatMap(r=>r.articles).sort((a,b)=>Date.parse(b.published)-Date.parse(a.published));
+    const patterns=[/\bIA\b|intelligence artificielle|openai|chatgpt|claude|gemini|gpt-/i,/fintech|finance|bourse|banque|boursier|chiffre d.affaires|résultats financiers/i,/cyber|faille|pirat|hameçonn|phishing|ransomware|sécurité informatique/i,/smartphone|iphone|galaxy|pixel|téléphone|montre connectée/i,/windows|linux|logiciel|processeur|carte graphique|nvidia|ordinateur|macbook|GPU/i,/jeu[x]? vidéo|gaming|playstation|xbox|nintendo|steam|console|GTA/i,/robot|spatial|fusée|spacex|NASA|satellite|astronaute/i];
+    const articles=results.flatMap(r=>r.articles).flatMap(a=>a.category?[a]:config.categories.flatMap((c,i)=>patterns[i].test(a.title)?[{...a,category:c.name}]:[])).sort((a,b)=>Date.parse(b.published)-Date.parse(a.published));
     state.sent=state.sent.filter(s=>Date.parse(s.sent_at)>+date-7*86400000);
     state.alerts=state.alerts.filter(s=>Date.parse(s)>+date-86400000);
     state.digests=state.digests.slice(-16);

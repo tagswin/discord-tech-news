@@ -1,16 +1,70 @@
 export default {
-  "digest_hours": [9, 18],
+  "digest_hours": [
+    9,
+    18
+  ],
   "max_alerts_per_day": 3,
   "excluded_pattern": "bon[s]? plan[s]?|code promo|promotion|soldes|réduction|offre[s]? du (jour|moment)|prix (cassé|abordable|imbattable)|meilleur prix|à moins de [0-9]|économisez|vente flash|privilégiez",
   "major_pattern": "panne (mondiale|massive|majeure|géante)|cyberattaque (massive|majeure)|faille critique|zero.day|fuite (massive|de données)|rachat historique|lance.{0,35}(GPT-[0-9]|Gemini [0-9]|Claude [0-9])",
-  "allowed_domains": ["numerama.com", "next.ink", "nextinpact.com", "01net.com", "frandroid.com", "clubic.com", "lesnumeriques.com", "zdnet.fr", "lemondeinformatique.fr", "usine-digitale.fr", "futura-sciences.com", "lemonde.fr", "franceinfo.fr", "francetvinfo.fr", "bfmtv.com", "lesechos.fr", "latribune.fr", "lefigaro.fr", "journaldunet.com", "journaldugeek.com", "generation-nt.com", "jeuxvideo.com"],
+  "allowed_domains": [
+    "numerama.com",
+    "next.ink",
+    "nextinpact.com",
+    "01net.com",
+    "frandroid.com",
+    "clubic.com",
+    "lesnumeriques.com",
+    "zdnet.fr",
+    "lemondeinformatique.fr",
+    "usine-digitale.fr",
+    "futura-sciences.com",
+    "lemonde.fr",
+    "franceinfo.fr",
+    "francetvinfo.fr",
+    "bfmtv.com",
+    "lesechos.fr",
+    "latribune.fr",
+    "lefigaro.fr",
+    "journaldunet.com",
+    "journaldugeek.com",
+    "generation-nt.com",
+    "jeuxvideo.com"
+  ],
   "categories": [
-    {"name": "🤖 Intelligence artificielle", "query": "(intelligence artificielle OR OpenAI OR Claude OR Gemini) technologie"},
-    {"name": "💰 Finance et fintech", "query": "(fintech OR finance OR bourse OR marchés financiers OR banque centrale)"},
-    {"name": "🔐 Cybersécurité", "query": "(cybersécurité OR cyberattaque OR faille informatique)"},
-    {"name": "📱 Smartphones et gadgets", "query": "(smartphone OR iPhone OR Samsung Galaxy OR objet connecté)"},
-    {"name": "💻 Informatique et logiciels", "query": "(processeur OR carte graphique OR Windows OR Linux OR logiciel) technologie"},
-    {"name": "🎮 Gaming", "query": "(jeu vidéo OR PlayStation OR Xbox OR Nintendo)"},
-    {"name": "🚀 Robotique et spatial", "query": "(robotique OR robot humanoïde OR SpaceX OR fusée OR satellite)"}
+    {
+      "name": "🤖 Intelligence artificielle",
+      "query": "(intelligence artificielle OR OpenAI OR Claude OR Gemini) technologie",
+      "bing_query": "intelligence artificielle"
+    },
+    {
+      "name": "💰 Finance et fintech",
+      "query": "(fintech OR finance OR bourse OR marchés financiers OR banque centrale)",
+      "bing_query": "finance"
+    },
+    {
+      "name": "🔐 Cybersécurité",
+      "query": "(cybersécurité OR cyberattaque OR faille informatique)",
+      "bing_query": "cybersécurité"
+    },
+    {
+      "name": "📱 Smartphones et gadgets",
+      "query": "(smartphone OR iPhone OR Samsung Galaxy OR objet connecté)",
+      "bing_query": "smartphone"
+    },
+    {
+      "name": "💻 Informatique et logiciels",
+      "query": "(processeur OR carte graphique OR Windows OR Linux OR logiciel) technologie",
+      "bing_query": "informatique"
+    },
+    {
+      "name": "🎮 Gaming",
+      "query": "(jeu vidéo OR PlayStation OR Xbox OR Nintendo)",
+      "bing_query": "jeu vidéo"
+    },
+    {
+      "name": "🚀 Robotique et spatial",
+      "query": "(robotique OR robot humanoïde OR SpaceX OR fusée OR satellite)",
+      "bing_query": "robotique"
+    }
   ]
 };

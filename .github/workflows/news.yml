@@ -1,16 +1,7 @@
 name: Le Radar Tech
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - bot.py
-      - config.json
-      - .github/workflows/news.yml
-  schedule:
-    - cron: '0 9,18 * * *'
-      timezone: Europe/Paris
-    - cron: '3-53/10 * * * *'
+  # La publication automatique est désormais assurée par Cloudflare.
   workflow_dispatch:
     inputs:
       mode:
@@ -21,7 +12,6 @@ on:
         options:
           - preview
           - test-discord
-          - veille
 
 permissions:
   contents: write
@@ -53,7 +43,6 @@ jobs:
           case "$RUN_MODE" in
             preview) python bot.py --dry-run ;;
             test-discord) python bot.py --test-message ;;
-            veille) python bot.py ;;
             *) exit 1 ;;
           esac
       - name: Sauvegarder l’historique même après un échec d’envoi
